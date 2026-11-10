@@ -1,0 +1,44 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 44 78% 92%;
+  --foreground: 30 40% 10%;
+  --muted: 42 45% 82%;
+  --muted-foreground: 30 20% 32%;
+  --border: 38 30% 70%;
+}
+
+html { scroll-behavior: smooth; overflow-x: clip; }
+body {
+  font-family: "Assistant", sans-serif;
+  color: hsl(var(--foreground));
+  background: #f6ead0;
+  overflow-x: clip;
+  max-width: 100%;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+
+h1, h2, h3 { font-family: "Fredoka", sans-serif; letter-spacing: -0.01em; }
+
+.ground {
+  background:
+    radial-gradient(90% 60% at 70% -10%, #f9d77e 0%, rgba(249, 215, 126, 0) 60%),
+    #f6ead0;
+}
+
+.btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-[10px] px-6 py-3.5 text-[17px] font-semibold transition-[transform,background-color] duration-150;
+}
+.btn:active { transform: translateY(1px); }
+.btn-ink { @apply bg-[#2b1d0e] text-[#f9e3a6] hover:bg-[#3d2a14]; }
+.btn-line { @apply border border-[#2b1d0e]/80 text-[#2b1d0e] hover:bg-[#2b1d0e]/5; }
+.btn-gold { @apply bg-[#e9b23a] text-[#2b1d0e] hover:bg-[#f0bf4f]; }
+
+.field { @apply w-full rounded-[10px] border border-[#2b1d0e]/25 bg-[#fffaf0] px-4 py-3 font-body text-[16px] text-[#2b1d0e] outline-none transition focus:border-[#2b1d0e] focus:ring-2 focus:ring-[#e9b23a]/50; }
+.label { @apply mb-1.5 block font-body text-[14px] font-semibold text-[#2b1d0e]/70; }
+.chip { @apply rounded-full border border-[#2b1d0e]/20 px-4 py-2 font-body text-[15px] font-semibold transition hover:border-[#2b1d0e]/60; }
+.chip-on { @apply border-[#2b1d0e] bg-[#2b1d0e] text-[#f9e3a6]; }
