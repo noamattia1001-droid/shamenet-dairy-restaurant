@@ -1,16 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Bike, LogOut, Phone, RefreshCw, ShoppingBag, Store, Users } from "lucide-react";
-import { AREAS } from "@/data/menu";
+import { LogOut, Phone, RefreshCw, ShoppingBag, Store, Utensils } from "lucide-react";
 
 type Order = {
-  id: string; createdAt: string; status: string; name: string; phone: string; type: string; address: string;
-  notes: string; items: { id: string; name: string; price: number; qty: number }[]; total: number; deliveryFee: number;
+  id: string; createdAt: string; status: string; name: string; phone: string; type: string; table?: string;
+  notes: string; items: { id: string; name: string; price: number; qty: number }[]; total: number;
 };
-type Resv = { id: string; createdAt: string; status: string; name: string; phone: string; date: string; time: string; guests: number; area: string; notes: string };
 
 const O_STATUS: Record<string, string> = { new: "חדשה", preparing: "בהכנה", ready: "מוכנה", done: "נמסרה", cancelled: "בוטלה" };
 const O_NEXT: Record<string, string> = { new: "preparing", preparing: "ready", ready: "done" };
-const R_STATUS: Record<string, string> = { pending: "ממתינה", confirmed: "אושרה", seated: "הגיעו", cancelled: "בוטלה" };
 const KEY = "shamenet-pass";
 const nis = (n: number) => `${n.toLocaleString("he-IL")} ₪`;
 const localDate = (d = new Date()) => new Date(d.getTime() - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
@@ -50,11 +47,8 @@ export default function Admin() {
 }
 
 function Board({ pass, logout }: { pass: string; logout: () => void }) {
-  const [tab, setTab] = useState<"orders" | "resv">("orders");
   const [orders, setOrders] = useState<Order[]>([]);
-  const [resv, setResv] = useState<Resv[]>([]);
   const [oFilter, setOFilter] = useState("active");
-  const [rDate, setRDate] = useState(localDate());
   const [loading, setLoading] = useState(false);
   const [updated, setUpdated] = useState<Date | null>(null);
   const seen = useRef<Set<string> | null>(null);
@@ -67,14 +61,13 @@ function Board({ pass, logout }: { pass: string; logout: () => void }) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [o, r] = await Promise.all([api("/api/orders"), api("/api/reservations")]);
+      const o = await api("/api/orders");
       if (Array.isArray(o)) {
         const ids = new Set(o.map((x: Order) => x.id));
         if (seen.current && o.some((x: Order) => !seen.current!.has(x.id))) beep();
         seen.current = ids;
         setOrders(o);
       }
-      if (Array.isArray(r)) setResv(r);
       setUpdated(new Date());
     } finally {
       setLoading(false);
@@ -83,17 +76,14 @@ function Board({ pass, logout }: { pass: string; logout: () => void }) {
 
   useEffect(() => { load(); const t = setInterval(load, 10000); return () => clearInterval(t); }, [load]);
 
-  const setStatus = async (kind: "orders" | "reservations", id: string, status: string) => {
-    if (kind === "orders") setOrders((l) => l.map((x) => (x.id === id ? { ...x, status } : x)));
-    else setResv((l) => l.map((x) => (x.id === id ? { ...x, status } : x)));
-    await api(`/api/${kind}`, { method: "PATCH", body: JSON.stringify({ id, status }) });
+  const setStatus = async (_kind: "orders", id: string, status: string) => {
+    setOrders((l) => l.map((x) => (x.id === id ? { ...x, status } : x)));
+    await api("/api/orders", { method: "PATCH", body: JSON.stringify({ id, status }) });
   };
 
   const today = localDate();
   const todays = orders.filter((o) => localDate(new Date(o.createdAt)) === today && o.status !== "cancelled");
   const active = orders.filter((o) => ["new", "preparing", "ready"].includes(o.status));
-  const dayResv = resv.filter((r) => r.date === rDate);
-  const todayResv = resv.filter((r) => r.date === today && r.status !== "cancelled");
   const shownOrders = oFilter === "active" ? active : oFilter === "today" ? orders.filter((o) => localDate(new Date(o.createdAt)) === today) : orders;
 
   return (
@@ -118,17 +108,11 @@ function Board({ pass, logout }: { pass: string; logout: () => void }) {
           <Stat label="הזמנות פתוחות" value={String(active.length)} hot={active.some((o) => o.status === "new")} />
           <Stat label="הכנסות היום" value={nis(todays.reduce((s, o) => s + o.total, 0))} />
           <Stat label="הזמנות היום" value={String(todays.length)} />
-          <Stat label="סועדים היום" value={String(todayResv.reduce((s, r) => s + r.guests, 0))} sub={`${todayResv.length} שולחנות`} />
+          <Stat label="טייק אוויי / במקום" value={`${todays.filter((o) => o.type !== "dinein").length} / ${todays.filter((o) => o.type === "dinein").length}`} sub="היום" />
         </div>
 
-        <div className="mt-8 flex gap-2">
-          <button onClick={() => setTab("orders")} className={`chip ${tab === "orders" ? "chip-on" : ""}`}><ShoppingBag className="ml-1.5 inline h-4 w-4" />הזמנות אוכל</button>
-          <button onClick={() => setTab("resv")} className={`chip ${tab === "resv" ? "chip-on" : ""}`}><Users className="ml-1.5 inline h-4 w-4" />שולחנות</button>
-        </div>
-
-        {tab === "orders" ? (
-          <>
-            <div className="mt-5 flex gap-4 font-body text-[15px] font-semibold">
+        <>
+            <div className="mt-8 flex gap-4 font-body text-[15px] font-semibold">
               {[["active", "פתוחות"], ["today", "היום"], ["all", "הכל"]].map(([v, l]) => (
                 <button key={v} onClick={() => setOFilter(v)} className={oFilter === v ? "underline decoration-[#e9b23a] decoration-[3px] underline-offset-[6px]" : "text-[#2b1d0e]/55"}>{l}</button>
               ))}
@@ -146,7 +130,7 @@ function Board({ pass, logout }: { pass: string; logout: () => void }) {
                   </div>
                   <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[14px] text-[#2b1d0e]/75">
                     <a href={`tel:${o.phone}`} dir="ltr" className="flex items-center gap-1 font-semibold"><Phone className="h-3.5 w-3.5" />{o.phone}</a>
-                    <span className="flex items-center gap-1">{o.type === "delivery" ? <><Bike className="h-3.5 w-3.5" />משלוח: {o.address}</> : <><Store className="h-3.5 w-3.5" />איסוף עצמי</>}</span>
+                    <span className="flex items-center gap-1">{o.type === "dinein" ? <><Utensils className="h-3.5 w-3.5" />לשבת במקום{o.table ? `, שולחן ${o.table}` : ""}</> : <><ShoppingBag className="h-3.5 w-3.5" />טייק אוויי</>}</span>
                   </div>
                   <ul className="mt-3 border-t border-[#2b1d0e]/10 pt-3 text-[15px]">
                     {o.items.map((i) => (
@@ -170,53 +154,7 @@ function Board({ pass, logout }: { pass: string; logout: () => void }) {
                 </article>
               ))}
             </div>
-          </>
-        ) : (
-          <>
-            <div className="mt-5 flex flex-wrap items-center gap-3">
-              <input type="date" className="field w-auto py-2" value={rDate} onChange={(e) => setRDate(e.target.value)} />
-              <button onClick={() => setRDate(today)} className="chip">היום</button>
-            </div>
-            <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-              {AREAS.map((a) => {
-                const used = dayResv.filter((r) => r.area === a.id && r.status !== "cancelled").reduce((s, r) => s + r.guests, 0);
-                return (
-                  <div key={a.id} className="rounded-[6px] border border-[#2b1d0e]/15 bg-[#fffaf0] p-4 font-body">
-                    <div className="text-[15px] font-bold">{a.name}</div>
-                    <div className="mt-1 text-[13px] text-[#2b1d0e]/60">{used} סועדים ביום, עד {a.capacity} בכל שעה</div>
-                  </div>
-                );
-              })}
-            </div>
-            {!dayResv.length && <Empty text="אין הזמנות שולחן לתאריך הזה." />}
-            <div className="mt-4 overflow-x-auto rounded-[6px] border border-[#2b1d0e]/15 bg-[#fffaf0]">
-              {dayResv.length > 0 && (
-                <table className="w-full min-w-[640px] font-body text-[15px]">
-                  <thead className="bg-[#2b1d0e]/5 text-right text-[13px] text-[#2b1d0e]/60">
-                    <tr><th className="p-3">שעה</th><th className="p-3">שם</th><th className="p-3">טלפון</th><th className="p-3">סועדים</th><th className="p-3">אזור</th><th className="p-3">הערות</th><th className="p-3">סטטוס</th></tr>
-                  </thead>
-                  <tbody>
-                    {dayResv.map((r) => (
-                      <tr key={r.id} className={`border-t border-[#2b1d0e]/10 ${r.status === "cancelled" ? "opacity-45" : ""}`}>
-                        <td className="p-3 font-bold" dir="ltr">{r.time}</td>
-                        <td className="p-3 font-semibold">{r.name}</td>
-                        <td className="p-3"><a href={`tel:${r.phone}`} dir="ltr">{r.phone}</a></td>
-                        <td className="p-3">{r.guests}</td>
-                        <td className="p-3">{AREAS.find((a) => a.id === r.area)?.name}</td>
-                        <td className="p-3 text-[14px] text-[#2b1d0e]/70">{r.notes}</td>
-                        <td className="p-3">
-                          <select value={r.status} onChange={(e) => setStatus("reservations", r.id, e.target.value)} className="rounded-[8px] border border-[#2b1d0e]/25 bg-transparent px-2 py-1.5 font-semibold">
-                            {Object.entries(R_STATUS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-                          </select>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          </>
-        )}
+        </>
       </main>
     </div>
   );

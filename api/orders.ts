@@ -2,7 +2,6 @@ import { save, all, get, newId, isAdmin, body, clean } from "./_store.js";
 import { MENU } from "../src/data/menu.js";
 
 const STATUSES = ["new", "preparing", "ready", "done", "cancelled"];
-const DELIVERY_FEE = 20;
 
 export default async function handler(req: any, res: any) {
   res.setHeader("Cache-Control", "no-store");
@@ -17,17 +16,15 @@ export default async function handler(req: any, res: any) {
         })
         .filter(Boolean);
       const name = clean(b.name, 60), phone = clean(b.phone, 20);
-      const type = b.type === "delivery" ? "delivery" : "pickup";
-      const address = clean(b.address, 160);
+      const type = b.type === "dinein" ? "dinein" : "takeaway";
+      const table = type === "dinein" ? clean(b.table, 10) : "";
       if (!items.length) return res.status(400).json({ error: "העגלה ריקה" });
       if (name.length < 2 || !/^0\d{8,9}$/.test(phone.replace(/\D/g, ""))) return res.status(400).json({ error: "חסר שם או טלפון תקין" });
-      if (type === "delivery" && address.length < 4) return res.status(400).json({ error: "חסרה כתובת למשלוח" });
       const subtotal = items.reduce((s: number, i: any) => s + i.price * i.qty, 0);
       const rec = {
         id: newId(), kind: "order", createdAt: new Date().toISOString(), status: "new",
-        name, phone, type, address, notes: clean(b.notes, 400), items,
-        subtotal, deliveryFee: type === "delivery" ? DELIVERY_FEE : 0,
-        total: subtotal + (type === "delivery" ? DELIVERY_FEE : 0),
+        name, phone, type, table, notes: clean(b.notes, 400), items,
+        subtotal, total: subtotal,
       };
       await save("orders", rec);
       return res.status(201).json({ id: rec.id, total: rec.total });
